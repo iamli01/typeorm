@@ -328,20 +328,69 @@ SELECT * FROM "post" WHERE "title" IS NULL
 -   `Raw`
 
 ```ts
-import { Raw } from "typeorm";
+import {Raw} from "typeorm";
 
 const loadedPosts = await connection.getRepository(Post).find({
-    likes: Raw("1 + likes = 4")
+    likes: Raw("dislikes - 4")
 });
 ```
 
 将执行以下查询：
 
 ```sql
-SELECT * FROM "post" WHERE 1 + "likes" = 4
+SELECT * FROM "post" WHERE "likes" = "dislikes" - 4
 ```
 
-> 注意：注意`Raw`操作符。 它应该从提供的表达式执行纯 SQL，而不能包含用户输入，否则将导致 SQL 注入。
+在最简单的情况下，将在等号后立即插入原始查询。
+但是您也可以使用该函数完全重写比较逻辑。
+
+```ts
+import {Raw} from "typeorm";
+
+const loadedPosts = await connection.getRepository(Post).find({
+    currentDate: Raw(alias =>`${alias} > NOW()`)
+});
+```
+
+将执行以下查询：
+
+```sql
+SELECT * FROM "post" WHERE "currentDate" > NOW()
+```
+
+如果需要提供用户输入，则不应直接在查询中包括用户输入，因为这可能会产生SQL注入漏洞。 相反，您可以使用Raw函数的第二个参数来提供要绑定到查询的参数列表。
+
+```ts
+import {Raw} from "typeorm";
+
+const loadedPosts = await connection.getRepository(Post).find({
+    currentDate: Raw(alias =>`${alias} > ':date'`, { date: "2020-10-06" })
+});
+```
+
+将执行以下查询：
+
+```sql
+SELECT * FROM "post" WHERE "currentDate" > '2020-10-06'
+```
+
+如果需要提供作为数组的用户输入，则可以使用特殊的表达式语法将它们绑定为SQL语句中的值列表：
+
+```ts
+import {Raw} from "typeorm";
+
+const loadedPosts = await connection.getRepository(Post).find({
+    title: Raw(alias =>`${alias} IN (:...titles)`, { titles: ["Go To Statement Considered Harmful", "Structured Programming"] })
+});
+```
+
+将执行以下查询：
+
+```sql
+SELECT * FROM "post" WHERE "titles" IN ('Go To Statement Considered Harmful', 'Structured Programming')
+```
+
+## 结合高级选项
 
 你还可以将这些运算符与`Not`运算符组合使用：
 
